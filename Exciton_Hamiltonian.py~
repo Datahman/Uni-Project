@@ -1,0 +1,229 @@
+import numpy as np
+from math import pi
+import cmath
+from datetime import datetime
+from scipy.constants import hbar, m_e, eV, c
+from scipy import linalg as LA
+from scipy.optimize import fsolve
+from scipy import optimize
+import pandas as pd
+import matplotlib.pyplot as plt
+startime= datetime.now()
+
+# All constant parameters used in the model are in units of micro eV.
+# Note: Scipy constants are in terms of SI units so use conversion.
+
+# Electron mass, m_e = 9.11e-31 kg / (1e-6*1.6e-19) = 0.511e12 mu eV. 
+m_e =  (m_e * c**2) /(1.6*(10**-25)) # mass of the electron * c^2, in micro eV  
+hbarc = (1.24 * (10**6)) / (2 * pi) # micro eV * micro m
+mub = 57.88 # micro eV / Tesla, the Bohr magneton
+
+# Other constants from supplementary material PRL 110 246403, Fig. S2
+m_ex = (0.21) * (m_e) # exciton mass from PRB 88 125307, in rough agreement with Szymanska and Littlewood
+#Values from Supplementary Material to PRL 110 246403
+#k_ex = 15.4 / micro m
+#E(k_{ex}) = (hbarc k_{ex})^2 / (2 me) =  9.04 micro eV
+#T = 0.1 K
+gemub = -0.01 * mub;  # The electronic g factor, no units, gemub * 7Tesla = -4.05
+ghmub = 0.0085 * mub; # The hole g factor, no units, ghmub * 7Tesla = 3.45
+
+# Values from PRB 88 195309 and from Supplementary Material to PRL 110 246403
+
+alphae = 0; # Electron Rashba strength, micro eV * micro m
+betae = 2.7;# Electron Dresselhaus strength, micro eV * micro m, betae * kf = 42 with Butov's numbers
+alphah = 0; # Hole Rashba strength, micro eV * micro m
+betah = 0.92;# hole Dresselhaus strength, micro eV * micro m, betah * kf = 14 with Butov's numbers
+gammah = 0.0;# hole cubic strength
+EbmEd = 5; #  micro eV
+deltad = -13;#  micro eV
+
+try:
+        
+    def Exciton_Hamiltonian(m,n,kf,BMagnetic=0.5,deltab=0.5,thetak=20,eig_index=False):
+        # p, Dataframe to store  eigenvalues, eigenvectors and the state.
+        p = pd.DataFrame(columns=['State', 'Eigen-Value','Eigen-Vector']) 
+        # This is the phase associated with the momentum
+        phasef = cmath.cos(thetak)+ 1j * cmath.sin(thetak) 
+        phasefc = cmath.cos(thetak) - (1j *  cmath.sin(thetak));
+        mylist = []
+        hhh1= float(((hbarc * kf)**2) / (2*m_ex)) # Matrix elements for diagonal elements only 
+
+    
+        for column in range(1,m+1):
+            for row in range(1,n+1):
+                if column==row: # For diagonal elements
+                    if column==1:
+                        mylist.append((hhh1)+(gemub * BMagnetic  / 2))
+                        
+                    elif column==2:
+                        mylist.append((hhh1)-((gemub-ghmub) * BMagnetic  / 2)+ EbmEd/2)  
+                        
+                    elif column==3:
+                        mylist.append((hhh1)-((gemub+ghmub) * BMagnetic  / 2)- EbmEd/2)  
+                    elif column==4:
+                        mylist.append((hhh1)+( ghmub * BMagnetic /2) - EbmEd/2)   
+                       
+                      
+                else:
+                    if column != row:
+                        if column ==1 and row ==2: 
+                            mylist.append(-deltab)
+                        elif column ==1 and row ==3:
+                            mylist.append((alphae * phasef * kf) + (betae * phasefc * kf))
+                        elif column ==1 and row ==4:
+                            mylist.append((alphah * phasefc * kf) + (betah * phasef * kf) + (gammah * (phasefc * kf)**3))
+                            
+                        elif column ==2 and row ==1: 
+                            mylist.append(-deltab)
+                        elif column ==2 and row ==3:
+                            mylist.append((alphah * phasefc * kf) + (betah * phasef * kf) + (gammah * (phasefc * kf)**3))
+                        elif column ==2 and row ==4:
+                            mylist.append((alphae * phasefc * kf) + (betae * phasef * kf))
+                            
+                        elif column ==3 and row ==1: 
+                            mylist.append((alphae * phasefc * kf) + (betae * phasef * kf))
+                        elif column ==3 and row ==2:
+                            mylist.append((alphah * phasef * kf) + (betah * phasefc * kf) + (gammah * (phasef * kf)**3))
+                        elif column ==3 and row ==4:
+                            mylist.append(-deltad)
+                        
+                        elif column ==4 and row ==1: 
+                            mylist.append((alphah * phasefc * kf) + (betah * phasef * kf) + (gammah * (phasefc * kf)**3))
+                        elif column ==4 and row ==2:
+                            mylist.append((alphae * phasef * kf) + (betae * phasefc * kf))
+                        elif column ==4 and row ==3:
+                            mylist.append(-deltad)
+                            
+        matrix = np.array([mylist],dtype='complex64')
+        matrix = matrix.reshape(4,4)
+        lambda_,v = LA.eig(matrix)
+        eigval_list= []
+        eigvec_list = []
+        for states in range(0,len(lambda_)):
+            each_eig = lambda_[states]
+            each_vector = v[states]
+            
+            p=p.append({'State':(states + int(1)),
+                    'Eigen-Value':each_eig,
+                    'Eigen-Vector':each_vector},ignore_index=True)
+            eigval_list.append(lambda_[states])
+            eigvec_list.append(each_vector)
+            
+        # Sort eigenvalues and the associated vectors in decreasing order.    
+        lambda_sorted  = np.sort(lambda_)  
+        v_sorted = v[:,lambda_.argsort()] 
+        #print lambda_sorted # output: [-15.72274303+0.3847526j   -6.19519711-0.62167209j  10.69609070-0.67525607j 27.61229134+0.91217381j]
+        #p.to_csv("Diag_result.csv")
+        
+
+        # To do.. Call Exciton_Hamiltonian in Fermi_Momenta: Done
+        # To do: Set up an arra consisting of all eigvalues and the corresponding k-values. Done
+        # To do: Find eigenvalues at crossing point e_F: Done. 
+        # To do: Corresponding k value for each Fermi surface.
+        
+        return eigval_list,  kf# Return eigenvalues in the form of list from diagnolization of the IX Hamiltonian.
+        
+
+    def Fermi_Momenta(NumkGridPoints,k_max,e_F=10): 
+        k_list = []
+        for k_index in range(1,NumkGridPoints+1):
+            k_vals = (k_max * (1-k_index)) / (1- NumkGridPoints) # Grid point setup for momentum(k) values.
+            k_list.append(float(k_vals))
+            
+        allk_eigval = []
+        k_list =list(set(k_list)) # Remove duplicate k values arising from k_vals.
+        eigN1 = [] # Each state eigen values at every k.  
+        eigN2 = []
+        eigN3 = []
+        eigN4 = []
+       
+        for each_k in k_list:
+            eigval_list, kf = Exciton_Hamiltonian(4,4,kf=each_k,BMagnetic=0.5,deltab=0.5,thetak=20,eig_index=False)
+            
+            allk_eigval.append(eigval_list)
+            #print eigval_list, eigval_list, str("For kf = "), each_k 
+            
+            #print k_list
+            
+            for eigval_per_Nstate in eigval_list:
+                try:
+                    if eigval_per_Nstate == eigval_list[0]:
+                        eigN1.append(eigval_per_Nstate)
+                    elif eigval_per_Nstate == eigval_list[1]:
+                        eigN2.append(eigval_per_Nstate)
+                    elif eigval_per_Nstate == eigval_list[2]:
+                        eigN3.append(eigval_per_Nstate)
+                    elif eigval_per_Nstate == eigval_list[3]:
+                        eigN4.append(eigval_per_Nstate)
+                    
+                except Exception as b:
+                    print(str(b))    
+        
+        
+        plt.plot(k_list,(eigN1),'g-', label='State 1', linewidth=2)
+        plt.plot(k_list,(eigN2),'b-', label='State 2', linewidth=2)
+        plt.plot(k_list,(eigN3),'r-', label='State 3', linewidth=2)
+        plt.plot(k_list,(eigN4),'y-', label='State 4', linewidth=2)
+        #plt.ylabel('est')
+        plt.title('Dummy graph')
+        plt.ylabel('Energy')
+        plt.xlabel('kF')
+        plt.legend()
+        plt.show()
+        
+        k_array = np.array(k_list,dtype='complex64')
+            #k_array = k_array.reshape(1,6)
+        
+        MaxNumFS = int (len(k_list)) # Define Maximum number of Fermi-Surfaces.
+        
+        k_array = k_array.reshape(1,MaxNumFS,1) # shape (6,1)
+        #print np.shape(k_array)
+        array_eigval = np.array((eigN1,eigN2,eigN3,eigN4),dtype='complex64').reshape(4,len(k_list),1) # Array consisting of all state eigenvalues at each k.  
+        #np.savetxt('eigval_at_kgrid',array_k_eigval,fmt='%2.2f')
+        
+        counter=0
+        Fermi_Surface_counter=0
+        data_frame = pd.DataFrame(columns=['State', 'Energy_interval_1','Energy_interval_2','Fermi-surface @ k'])    
+        for eigloop in range(0,len(eigval_list) ): # To fix: use eigloop 1 not zero !
+             
+            for WhichValuek in range(0,6):
+                
+                counter+=1
+                if WhichValuek == 0: # Note: Ignore first iteration values since first interval is the minimum value! no comparison can be set.
+                                     # if this condition not used, output: [-0.24422552+0.j] [ 27.61229134+0.91217381j] counter = 1                 
+                    pass
+                else: 
+                    x_1 =  array_eigval[eigloop,WhichValuek,:] # x_1 is the first element interval eigen value.
+                    x_2 =  array_eigval[eigloop,WhichValuek-1,:] # x_2 is the second element interval eigen value.
+                                                             # print x_1,x_2 , counter           # Ahead interval: x_1, previous interval x_2.
+
+                    # Now apply Fermi energy, e_F crossing condition.
+                    if (((x_1) > (e_F)) and ((x_2) < (e_F)) ) or (((x_1) < (e_F)) and ((x_2) > (e_F)) ):
+                        Fermi_Surface_counter+=1
+                        #print  WhichValuek , x_1,x_2, eigloop                     
+                        #interval= [k_array[:,WhichValuek,:],k_array[:,WhichValuek-1,:]]                        
+                        #print  each_k, WhichValuek
+                        data_frame = data_frame.append({'State':eigloop + int(1),
+                                        'Energy_interval_1':x_1,
+                                        'Energy_interval_2':x_2,
+                                        'Fermi-surface @ k':WhichValuek,
+                                        'Fermi-Count':Fermi_Surface_counter}, ignore_index=True)
+                    print Fermi_Surface_counter
+
+                    
+                    if Fermi_Surface_counter >> MaxNumFS:
+                        print "Error! Number of Fermi Surfaces exceed max possible."
+                    else: 
+                        pass # Pass the fermi-surfaces not found between intervals x_1, x_2.
+                #print data_frame            
+        return  # str("The number of Fermi-Surfaces is:"), Fermi_Surface_counter
+        
+        #return k_Array  #k_Array is a 1-D grid of Fermi momenta, from k = 0 to k = kmax
+            
+except Exception as e:
+    print(str(e))
+#some_var = Exciton_Hamiltonian(4,4,kf=5)
+some_var = (Fermi_Momenta(100,25))   
+print some_var
+
+print datetime.now()- startime

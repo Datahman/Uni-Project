@@ -1,0 +1,84 @@
+#from math import pi
+#from math import sin, cos
+#from math import sqrt
+#
+#import numpy as np
+import matplotlib.pyplot as plt
+#from mpl_toolkits.mplot3d import Axes3D
+#def integrate(numTheta):
+#    
+#    theta_Array = []
+#    for n in range(1,numTheta + 2):
+#        thetak = 2 * pi * (n - 1) / (numTheta)
+#        theta_Array.append(thetak)
+#    return theta_Array
+#a = integrate(40)
+##print len(a)
+#a_list = []
+#b_list = []
+#def k_space(Ls,LL,Theta_phase):
+#    for i in range(1,LL):
+#        for j in range(1,LL):
+#            
+#            if i ==1 and j ==1:
+#                sinq =0
+#                cosq=0
+#            elif (2 * (j-1)) ==LL and j == (2 * (i-1)) ==LL :
+#                sinq=0
+#                cosq=0
+#            elif i==1 and j == (2 * (i-1)) ==LL :
+#                sinq=0
+#                cosq=0
+#            elif j==1 and i == (2 * (i-1)) ==LL :
+#                sinq=0
+#                cosq=0
+#            else:
+#                
+#                q_i = sin((i-1)* pi / LL) * (2/Ls) 
+#                q_j = sin((j-1)* pi / LL) * (2/Ls)
+#                q_mag = q_i**2 + q_j**2 
+#                sinq = q_i / sqrt(q_mag)
+#                cosq = q_j / sqrt(q_mag)
+#                
+#                costhetaq = (cosq * cos(Theta_phase)) + (sinq * sin(Theta_phase))
+#                sinthetaq = (-cosq * sin(Theta_phase)) + (cos(Theta_phase) * sinq)
+#                    
+#                x = range(int(costhetaq))
+#                y = range(int(sinthetaq))
+#                data = np.random.random((costhetaq,sinthetaq))
+#                hf = plt.figure()
+#                ha = hf.add_subplot(111,projection='3d')
+#                X,Y = np.meshgrid(x,y)
+#                ha.plot_surface(X,Y,data)
+#                plt.show()
+#            
+#                a_list.append((q_i,q_j))
+#                b_list.append((sinthetaq,costhetaq))
+#                
+#                
+#    return len(a_list) , "Now b_list is:" , b_list  , q_mag
+#b = k_space(1.57,4,0)
+#print b
+#
+#def BBA(x0,y0,x1,y1):
+#    
+#    dx = x1 - x0
+#    dy = y1 - y0
+#    error = -1.0
+#    delta_error = abs(dy/dx)
+#    if dx !=0:
+#        y= y0
+#        a_list = []
+#        b_list= []
+#        for i in range (x0,x1):
+#            a_list.append(i)
+#            b_list.append(y)
+#            error = error + delta_error
+#            print (a_list), error
+#        
+#            if error >=0:
+#                y = y + 1
+#                error -= 1
+#        plt.plot(a_list,b_list)
+#        plt.show()
+#BBA(1,4,30,40)      # Only works for positive slope i.e. dy/dx > 0
